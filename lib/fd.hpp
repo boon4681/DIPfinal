@@ -33,11 +33,9 @@ public:
         {
             for (int x = 0; x < width; x++)
             {
-                int gray = 0;
-                if (x < imgWidth && y < imgHeight)
-                {
-                    gray = im->getRGB(x, y) & 0xff;
-                }
+                int sx = x < imgWidth ? x : imgWidth - 1;
+                int sy = y < imgHeight ? y : imgHeight - 1;
+                int gray = im->getRGB(sx, sy) & 0xff;
                 img[y * width + x] = Complex(gray, 0);
             }
         }

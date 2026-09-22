@@ -33,8 +33,11 @@ public:
         {
             for (int x = 0; x < width; x++)
             {
-                int color = im->getRGB(x, y);
-                int gray = color & 0xff;
+                int gray = 0;
+                if (x < imgWidth && y < imgHeight)
+                {
+                    gray = im->getRGB(x, y) & 0xff;
+                }
                 img[y * width + x] = Complex(gray, 0);
             }
         }
@@ -123,7 +126,7 @@ public:
             fft(&img[y * width], width, invert);
         }
         // Columns
-        Complex *column = new Complex[imgHeight];
+        Complex *column = new Complex[height];
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height; y++)
@@ -205,9 +208,9 @@ public:
     {
         shifting();
         fft2d(true);
-        for (int y = 0; y < height; y++)
+        for (int y = 0; y < imgHeight; y++)
         {
-            for (int x = 0; x < width; x++)
+            for (int x = 0; x < imgWidth; x++)
             {
                 int gray = (int)img[y * width + x].real();
                 gray = gray > 255 ? 255 : gray;

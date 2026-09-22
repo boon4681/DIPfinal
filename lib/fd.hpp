@@ -178,6 +178,8 @@ public:
             std::cout << "Unable to create file" << std::endl;
             return false;
         }
+        *(int *)&im->header[18] = width;
+        *(int *)&im->header[22] = height;
         fwrite(im->header, sizeof(unsigned char), BMP_HEADER_SIZE, fo);
         if (im->bitDepth <= 8)
         {

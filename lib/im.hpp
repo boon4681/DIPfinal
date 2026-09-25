@@ -92,7 +92,13 @@ public:
 
         data.resize((size_t)width * height * (bitDepth / 8));
         origin.resize((size_t)width * height * (bitDepth / 8));
-        fread(origin.data(), 1, origin.size(), fi);
+        int size = width * (bitDepth / 8);
+        int padding = (4 - size % 4) % 4;
+        for (int y = 0; y < height; y++)
+        {
+            fread(origin.data() + (size_t)y * size, 1, size, fi);
+            fseek(fi, padding, 1);
+        }
         data = origin;
 
         fclose(fi);

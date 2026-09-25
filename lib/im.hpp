@@ -1286,13 +1286,14 @@ public:
         }
     }
 
-    void houghTransform(double percent, const std::string &houghArrayPath = "")
+    std::vector<std::tuple<Point, Point, std::tuple<double, double>>> houghTransform(double percent, const std::string &houghArrayPath = "")
     {
         if (percent <= 0 || percent > 1)
         {
             std::cout << "Percent must be greater than 0 and not greater than 1." << std::endl;
-            return;
+            return {};
         }
+        std::vector<std::tuple<Point, Point, std::tuple<double, double>>> list{};
         // The image should be converted to a binary edge map first
         // Work out how the Hough space is quantized
         int numOfTheta = 180;
@@ -1364,7 +1365,7 @@ public:
             delete[] houghArray;
             delete[] cosTheta;
             delete[] sinTheta;
-            return;
+            return list;
         }
         // Write the normalized Hough array for demonstration
         int oldWidth = width;
@@ -1449,16 +1450,25 @@ public:
                     }
                     double tsin = sinTheta[i];
                     double tcos = cosTheta[i];
+                    std::tuple<Point, Point, std::tuple<double, double>> line{};
+                    bool found = false;
                     if (i <= numOfTheta / 4 || i >= (3 * numOfTheta) / 4)
                     {
                         for (int y = 0; y < height; y++)
                         {
-                            int x = (int)round(
-                                ((j - highestR) - (y - centreY) * tsin) / tcos + centreX);
+                            int x = (int)round(((j - highestR) - (y - centreY) * tsin) / tcos + centreX);
                             if (x >= 0 && x < width)
                             {
                                 int redColor = (255 << 16);
                                 setRGB(x, y, redColor);
+                                auto &[start, end, angle] = line;
+                                if (!found)
+                                {
+                                    start = {x, y};
+                                    angle = {tsin, tcos};
+                                }
+                                end = {x, y};
+                                found = true;
                             }
                         }
                     }
@@ -1466,14 +1476,25 @@ public:
                     {
                         for (int x = 0; x < width; x++)
                         {
-                            int y = (int)round(
-                                ((j - highestR) - (x - centreX) * tcos) / tsin + centreY);
+                            int y = (int)round(((j - highestR) - (x - centreX) * tcos) / tsin + centreY);
                             if (y >= 0 && y < height)
                             {
                                 int redColor = (255 << 16);
                                 setRGB(x, y, redColor);
+                                auto &[start, end, angle] = line;
+                                if (!found)
+                                {
+                                    start = {x, y};
+                                    angle = {tsin, tcos};
+                                }
+                                end = {x, y};
+                                found = true;
                             }
                         }
+                    }
+                    if (found)
+                    {
+                        list.push_back(line);
                     }
                 }
             }
@@ -1485,6 +1506,7 @@ public:
         delete[] houghArray;
         delete[] cosTheta;
         delete[] sinTheta;
+        return list;
     }
 
     void regionGrowing(int seedX, int seedY, int threshold, bool useEightConnectivity)
@@ -2216,15 +2238,23 @@ public:
         return {xh / w, yh / w};
     }
 
-    void applyHomography(std::vector<double> &H)
+    void applyHomography(std::vector<double> &H, int outw = -1, int outh = -1)
     {
-        int *tempBuf = new int[height * width];
-        std::vector<double> invH = invertHomography(H);
-        for (int y = 0; y < height; y++)
+        if (outw <= 0)
         {
-            for (int x = 0; x < width; x++)
+            outw = width;
+        }
+        if (outh <= 0)
+        {
+            outh = height;
+        }
+        int *tempBuf = new int[outh * outw];
+        std::vector<double> invH = invertHomography(H);
+        for (int y = 0; y < outh; y++)
+        {
+            for (int x = 0; x < outw; x++)
             {
-                int destinationY = height - y - 1;
+                int destinationY = outh - y - 1;
                 std::vector<double> sourcePoint =
                     applyHomographyToPoint(invH, x, destinationY);
                 int srcX = (int)round(sourcePoint[0]);
@@ -2232,14 +2262,17 @@ public:
                 int srcY = height - sourceY - 1;
                 if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height)
                 {
-                    tempBuf[y * width + x] = getRGB(srcX, srcY);
+                    tempBuf[y * outw + x] = getRGB(srcX, srcY);
                 }
                 else
                 {
-                    tempBuf[y * width + x] = 0;
+                    tempBuf[y * outw + x] = 0;
                 }
             }
         }
+        width = outw;
+        height = outh;
+        data.assign((size_t)width * height * (bitDepth / BYTE), 0);
         for (int y = 0; y < height; y++)
         {
             for (int x = 0; x < width; x++)

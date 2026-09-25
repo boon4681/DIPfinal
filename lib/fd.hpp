@@ -204,6 +204,24 @@ public:
         return abs(img[y * width + x]);
     }
 
+    Complex binAt(int x, int y)
+    {
+        return img[y * width + x];
+    }
+
+    void setBin(int x, int y, Complex v)
+    {
+        img[y * width + x] = v;
+    }
+
+    void reset()
+    {
+        for (int i = 0; i < (height * width); i++)
+        {
+            img[i] = original[i];
+        }
+    }
+
     void getInverse()
     {
         shifting();

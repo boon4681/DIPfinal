@@ -1,4 +1,6 @@
 // include script to load as a bullet
+#include "./final/inspect.cpp"
+#include "./final/final.cpp"
 #include "./final/main.cpp"
 
 #include <cstdio>
@@ -15,4 +17,8 @@ int main()
         }
         printf("\n");
     }
+    return 0;
 }
+
+
+// 512, 511

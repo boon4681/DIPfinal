@@ -173,7 +173,7 @@ bullet(destripe)
 {
     ImBMP img("./resource/FinalDIP69.bmp");
     img.convertToGrayscale();
-    // img.alphaTrimmedFilter(3, 5);
+    img.alphaTrimmedFilter(3, 5);
 
     int width = img.width;
     int height = img.height;

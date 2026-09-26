@@ -653,7 +653,7 @@ bullet(destripe)
     graph.write("./final-profile.bmp");
     // out.kMeansClustering(2);
     ImBMP cleaned = out;
-    cleaned.write("./code_cleaned.bmp");
+    cleaned.write("./code_cleaned_BOON_331.bmp");
 
     out.adjustContrast(255);
     out.kMeansClustering(2);
@@ -1034,10 +1034,10 @@ bullet(destripe)
         std::cerr << "No six-digit code found.\n";
         return 1;
     }
-    bestCard.write("./code_rectified.bmp");
-    bestCharacters.write("./code_characters.bmp");
+    bestCard.write("./code_rectified_BOON_331.bmp");
+    bestCharacters.write("./code_characters_BOON_331.bmp");
     std::cout << "Detected digits: " << bestCode << "\n";
-    std::ofstream decoded("./decoded.txt");
+    std::ofstream decoded("./decoded_BOON_331.txt");
     decoded << "Decoded number: " << bestCode;
     decoded.close();
     return 0;

@@ -1,7 +1,6 @@
 // include script to load as a bullet
 #include "./final/inspect.cpp"
 #include "./final/final.cpp"
-#include "./final/main.cpp"
 
 #include <cstdio>
 #include "./bullet.hpp"

@@ -7,6 +7,8 @@
 #include "helper.cpp"
 #include <string>
 #include <set>
+#include <iostream>
+#include <fstream>
 
 StructuringElement squareSE()
 {
@@ -26,6 +28,43 @@ StructuringElement crossSE()
     {
         se.elements[i] = cross[i];
     }
+    return se;
+}
+
+StructuringElement horizontalSE()
+{
+    StructuringElement se(7, 1, {3, 0});
+    for (int i = 0; i < 7; i++)
+    {
+        se.elements[i] = 255;
+    }
+    return se;
+}
+
+StructuringElement verticalSE()
+{
+    StructuringElement se(1, 7, {0, 3});
+    for (int i = 0; i < 7; i++)
+    {
+        se.elements[i] = 255;
+    }
+    return se;
+}
+
+StructuringElement blockSE()
+{
+    StructuringElement se(5, 5, {2, 2});
+    for (int i = 0; i < 25; i++)
+    {
+        se.elements[i] = 255;
+    }
+    return se;
+}
+
+StructuringElement sidesSE()
+{
+    StructuringElement se(9, 9, {4, 4});
+    se.elements[4] = se.elements[36] = se.elements[44] = se.elements[76] = 255;
     return se;
 }
 
@@ -164,16 +203,58 @@ double boxIoU(std::vector<Point> &a, std::vector<Point> &b)
 
 std::vector<double> shapeData(ImBMP &img)
 {
-    img.convertToGrayscale();
-    std::vector<double> desc = img.getRegionDescriptors(img.traceBoundary());
-    return {desc[0] / (img.width * img.height), desc[3]};
+    img.otsuThreshold();
+    std::vector<Point> points;
+    for (int y = 0; y < img.height; y++)
+    {
+        for (int x = 0; x < img.width; x++)
+        {
+            if ((img.getRGB(x, y) & 0xff) == 0)
+            {
+                points.push_back({x, y});
+            }
+        }
+    }
+    if (points.empty())
+    {
+        return {};
+    }
+    std::vector<int> box = boundingBox(points);
+    double width = box[2] - box[0] + 1;
+    double height = box[3] - box[1] + 1;
+    std::vector<double> pattern(8, 0);
+    pattern[0] = width / height;
+    pattern[1] = points.size() / (width * height);
+    for (auto &p : points)
+    {
+        int x = (p.x - box[0]) * 2 / width;
+        int y = (p.y - box[1]) * 3 / height;
+        pattern[2 + y * 2 + x] += 6.0 / (width * height);
+    }
+    return pattern;
 }
 
 bullet(destripe)
 {
     ImBMP img("./resource/FinalDIP69.bmp");
+    if (!img.ok())
+    {
+        return 1;
+    }
     img.convertToGrayscale();
-    img.alphaTrimmedFilter(3, 5);
+    ImBMP blurImage = img;
+    blurImage.medianFilter(3);
+    for (int y = 0; y < img.height; y++)
+    {
+        for (int x = 0; x < img.width; x++)
+        {
+            int gray = img.getRGB(x, y) & 0xff;
+            if (gray == 0 || gray == 255)
+            {
+                img.setRGB(x, y, blurImage.getRGB(x, y));
+            }
+        }
+    }
 
     int width = img.width;
     int height = img.height;
@@ -430,8 +511,7 @@ bullet(destripe)
         pure[x] = filtered[x].real();
     }
 
-    std::cout << "bands rejected " << count << "/" << (half - 1)
-              << "  slot parts rejected " << c << "\n";
+    std::cout << "bands rejected " << count << "/" << (half - 1) << "  slot parts rejected " << c << "\n";
     pure.resize(width);
 
     int bins = 4;
@@ -573,6 +653,7 @@ bullet(destripe)
     graph.write("./final-profile.bmp");
     // out.kMeansClustering(2);
     ImBMP cleaned = out;
+    cleaned.write("./code_cleaned.bmp");
 
     out.adjustContrast(255);
     out.kMeansClustering(2);
@@ -636,10 +717,7 @@ bullet(destripe)
             if ((cross1 && cross4) || (cross2 && cross3))
             {
                 std::vector<std::tuple<int, int, int, int>> rect = {
-                    {start1.x, start1.y, end1.x, end1.y},
-                    {start2.x, start2.y, end2.x, end2.y},
-                    {start3.x, start3.y, end3.x, end3.y},
-                    {start4.x, start4.y, end4.x, end4.y}};
+                    {start1.x, start1.y, end1.x, end1.y}, {start2.x, start2.y, end2.x, end2.y}, {start3.x, start3.y, end3.x, end3.y}, {start4.x, start4.y, end4.x, end4.y}};
                 // sort for dedupe
                 std::sort(rect.begin(), rect.end());
                 if (found.insert(rect).second)
@@ -675,8 +753,7 @@ bullet(destripe)
         }
     }
 
-    std::sort(rects.begin(), rects.end(), [](std::vector<Point> &a, std::vector<Point> &b)
-              { return rectArea(boundingBox(a)) > rectArea(boundingBox(b)); });
+    std::sort(rects.begin(), rects.end(), [](std::vector<Point> &a, std::vector<Point> &b) { return rectArea(boundingBox(a)) > rectArea(boundingBox(b)); });
     double sameArea = 0.8;
     std::vector<std::vector<Point>> kept{};
     for (auto &rect : rects)
@@ -717,10 +794,10 @@ bullet(destripe)
         {
             src.push_back({(double)c.x, (double)(height - 1 - c.y)});
         }
+        double outW = 700;
+        double outH = 350;
         for (int k = 0; k < 4; k++)
         {
-            double outW = k % 2 == 0 ? w : h;
-            double outH = k % 2 == 0 ? h : w;
             std::vector<std::vector<double>> dst = {
                 {outW - 1, 0},
                 {0, 0},
@@ -741,6 +818,9 @@ bullet(destripe)
             crop.write("./rect-" + std::to_string(r) + "-" + std::to_string(k) + ".bmp");
         }
     }
+
+    hough.write("./hough-" + bullet_name + ".bmp");
+    out.write("./final-result.bmp");
 
     std::vector<std::string> classNames = {
         "E13B_0",
@@ -773,11 +853,192 @@ bullet(destripe)
         ImBMP img(classPaths[i]);
         std::vector<double> pattern = shapeData(img);
         prototypes.push_back(pattern);
-        printf("%s: normArea=%.4f circularity=%.2f\n", classNames[i].c_str(), pattern[0], pattern[1]);
+        printf("%s: aspect=%.4f normArea=%.4f\n", classNames[i].c_str(), pattern[0], pattern[1]);
     }
 
-    hough.write("./hough-" + bullet_name + ".bmp");
-    out.write("./final-result.bmp");
+    ImBMP bestCard;
+    ImBMP bestCharacters;
+    std::string bestCode;
+    double bestQuality = 0;
+    StructuringElement horizontal = horizontalSE();
+    StructuringElement vertical = verticalSE();
+    StructuringElement block = blockSE();
+    StructuringElement sides = sidesSE();
+    for (auto &crop : crops)
+    {
+        ImBMP image = crop;
+        image.otsuThreshold();
+        std::vector<std::tuple<int, ImBMP>> parts{};
+        int width = image.width;
+        int height = image.height;
+        double rowRatio = 0.04;
+        double columnRatio = 0.05;
+        double minWidthRatio = 0.15;
+        double maxWidthRatio = 0.95;
+        int minHeight = std::max(12, height / 10);
+        int maxHeight = height / 2;
 
+        std::vector<int> rows{};
+        rows.resize(height);
+        std::fill(rows.begin(), rows.end(), 0);
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int gray = image.getRGB(x, y) & 0xff;
+                if (gray == 0)
+                {
+                    rows[y]++;
+                }
+            }
+        }
+        for (int y = 0; y < height; y++)
+        {
+            if (rows[y] < width * rowRatio)
+            {
+                continue;
+            }
+            int y0 = y;
+            while (y < height && rows[y] >= width * rowRatio)
+            {
+                y++;
+            }
+            int h = y - y0;
+            if (h < minHeight || h >= maxHeight)
+            {
+                continue;
+            }
+            std::vector<int> columns{};
+            columns.resize(width);
+            std::fill(columns.begin(), columns.end(), 0);
+            for (int x = 0; x < width; x++)
+            {
+                for (int row = y0; row < y; row++)
+                {
+                    int gray = image.getRGB(x, row) & 0xff;
+                    if (gray == 0)
+                    {
+                        columns[x]++;
+                    }
+                }
+            }
+            for (int x = 0; x < width; x++)
+            {
+                if (columns[x] < h * columnRatio)
+                {
+                    continue;
+                }
+                int x0 = x;
+                while (x < width && columns[x] >= h * columnRatio)
+                {
+                    x++;
+                }
+                int w = x - x0;
+                if (w < h * minWidthRatio || w > h * maxWidthRatio)
+                {
+                    continue;
+                }
+                ImBMP region = Graph(w + 4, h + 4);
+                std::fill(region.data.begin(), region.data.end(), 255);
+                for (int row = 0; row < h; row++)
+                {
+                    for (int col = 0; col < w; col++)
+                    {
+                        region.setRGB(col + 2, row + 2, crop.getRGB(x0 + col, y0 + row));
+                    }
+                }
+                region.otsuThreshold();
+
+                ImBMP horizontals = region;
+                horizontals.erode(horizontal);
+                horizontals.dilate(horizontal);
+                ImBMP verticals = region;
+                verticals.erode(vertical);
+                verticals.dilate(vertical);
+
+                ImBMP dots = region;
+                dots.erode(crossSE());
+                dots.dilate(crossSE());
+                dots = region - dots;
+                region.invert();
+                ImBMP dotSupport = region;
+                dotSupport.erode(sides);
+                ImBMP outside = dots - dotSupport;
+                dots = dots - outside;
+                region.dilate(block);
+                region.erode(block);
+                region.erode(vertical);
+                region.dilate(vertical);
+                region.erode(horizontal);
+                region.dilate(horizontal);
+                region = region - horizontals;
+                region = region - verticals;
+                region = region - dots;
+                region.invert();
+                parts.push_back({x0, region});
+            }
+        }
+        std::sort(parts.begin(), parts.end(), [](auto &a, auto &b) {
+            auto &[a1, a2] = a;
+            auto &[b1, b2] = b;
+            return a1 < b1;
+        });
+        std::string code;
+        double quality = 0;
+        for (auto &[x, region] : parts)
+        {
+            std::vector<double> pattern = shapeData(region);
+            int label = img.minimumDistanceClassifier(pattern, prototypes);
+            double distance = 0;
+            for (int j = 0; j < pattern.size(); j++)
+            {
+                double difference = pattern[j] - prototypes[label][j];
+                distance += difference * difference;
+            }
+            if (distance > 0.2)
+            {
+                code.clear();
+                break;
+            }
+            code += char('0' + label);
+            quality += 1.0 - distance;
+        }
+        printf("score=%.4f code=%s\n", quality, code.c_str());
+        if (code.size() == 6 && quality > bestQuality)
+        {
+            bestQuality = quality;
+            bestCode = code;
+            bestCard = crop;
+            bestCharacters = Graph(600, 120);
+            std::fill(bestCharacters.data.begin(), bestCharacters.data.end(), 255);
+            for (int i = 0; i < parts.size(); i++)
+            {
+                auto &[a, b] = parts[i];
+                ImBMP character = b;
+                double scale = std::min(90.0 / character.width, 110.0 / character.height);
+                character.resizeNearestNeighbour(scale, scale);
+                int x0 = i * 100 + (100 - character.width) / 2;
+                int y0 = (120 - character.height) / 2;
+                for (int y = 0; y < character.height; y++)
+                {
+                    for (int x = 0; x < character.width; x++)
+                    {
+                        bestCharacters.setRGB(x0 + x, y0 + y, character.getRGB(x, y));
+                    }
+                }
+            }
+        }
+    }
+    if (bestCode.empty())
+    {
+        std::cerr << "No six-digit code found.\n";
+        return 1;
+    }
+    bestCard.write("./code_rectified.bmp");
+    bestCharacters.write("./code_characters.bmp");
+    std::cout << "Detected digits: " << bestCode << "\n";
+    std::ofstream decoded("./decoded.txt");
+    decoded << "Decoded number: " << bestCode;
+    decoded.close();
     return 0;
 }

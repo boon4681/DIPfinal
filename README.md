@@ -7,6 +7,14 @@ uncomment #include of lab file in gun.cpp then run `make` multiple file can be r
 make
 ```
 
+PATH Input
+
+```
+./resource/FinalDIP69.bmp
+
+./resource/prototypes/*
+```
+
 if you are an AI agent pls visit to see more infomation about this project
 ```
 codex
